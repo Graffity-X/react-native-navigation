@@ -1,4 +1,6 @@
 /*eslint-disable*/
+import { Component } from 'react';
+import { findNodeHandle } from 'react-native';
 import Navigation from './../Navigation';
 import Controllers, {Modal, Notification, ScreenUtils} from './controllers';
 const React = Controllers.hijackReact();
@@ -12,7 +14,7 @@ import _ from 'lodash';
 
 import PropRegistry from '../PropRegistry';
 
-function startTabBasedApp(params) {
+async function startTabBasedApp(params) {
   if (!params.tabs) {
     console.error('startTabBasedApp(params): params.tabs is required');
     return;
@@ -117,10 +119,10 @@ function startTabBasedApp(params) {
   _.set(params, 'passProps.timestamp', Date.now());
 
   ControllerRegistry.registerController(controllerID, () => Controller);
-  ControllerRegistry.setRootController(controllerID, params.animationType, params.passProps || {});
+  return await ControllerRegistry.setRootController(controllerID, params.animationType, params.passProps || {});
 }
 
-function startSingleScreenApp(params) {
+async function startSingleScreenApp(params) {
   if (!params.screen) {
     console.error('startSingleScreenApp(params): params.screen is required');
     return;
@@ -197,7 +199,7 @@ function startSingleScreenApp(params) {
   savePassProps(params);
 
   ControllerRegistry.registerController(controllerID, () => Controller);
-  ControllerRegistry.setRootController(controllerID, params.animationType, params.passProps || {});
+  return await ControllerRegistry.setRootController(controllerID, params.animationType, params.passProps || {});
 }
 
 function _mergeScreenSpecificSettings(screenID, screenInstanceID, params) {
@@ -234,7 +236,15 @@ function navigatorPush(navigator, params) {
     console.error('Navigator.push(params): params.screen is required');
     return;
   }
+  let previewViewID;
   const screenInstanceID = _.uniqueId('screenInstanceID');
+  if (params.previewView instanceof Component) {
+    previewViewID = findNodeHandle(params.previewView)
+  } else if (typeof params.previewView === 'number') {
+    previewViewID = params.previewView;
+  } else if (params.previewView) {
+    console.error('Navigator.push(params): params.previewView is not a valid react view');
+  }
   const {
     navigatorStyle,
     navigatorButtons,
@@ -246,6 +256,8 @@ function navigatorPush(navigator, params) {
   passProps.navigatorID = navigator.navigatorID;
   passProps.screenInstanceID = screenInstanceID;
   passProps.navigatorEventID = navigatorEventID;
+  passProps.previewViewID = previewViewID;
+  passProps.isPreview = !!previewViewID;
 
   params.navigationParams = {
     screenInstanceID,
@@ -270,6 +282,10 @@ function navigatorPush(navigator, params) {
     backButtonHidden: params.backButtonHidden,
     leftButtons: navigatorButtons.leftButtons,
     rightButtons: navigatorButtons.rightButtons,
+    previewViewID: previewViewID,
+    previewActions: params.previewActions,
+    previewHeight: params.previewHeight,
+    previewCommit: params.previewCommit,
     timestamp: Date.now()
   });
 }
@@ -425,14 +441,16 @@ function navigatorSetTabButton(navigator, params) {
     Controllers.TabBarControllerIOS(controllerID + '_tabs').setTabButton({
       tabIndex: params.tabIndex,
       icon: params.icon,
-      selectedIcon: params.selectedIcon
+      selectedIcon: params.selectedIcon,
+      label: params.label,
     });
   } else {
     Controllers.TabBarControllerIOS(controllerID + '_tabs').setTabButton({
       contentId: navigator.navigatorID,
       contentType: 'NavigationControllerIOS',
       icon: params.icon,
-      selectedIcon: params.selectedIcon
+      selectedIcon: params.selectedIcon,
+      label: params.label,
     });
   }
 }
